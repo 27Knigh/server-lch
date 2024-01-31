@@ -21,6 +21,20 @@ const char* LogLevel::ToString(LogLevel::Level level) {
     return "UNKNOW";
 }
 
+/*******************************LogEventWrap*********************************/
+LogEventWrap::LogEventWrap(LogEvent::ptr e) 
+    :m_event(e){
+
+}
+LogEventWrap::~LogEventWrap() {
+    m_event->getLogger()->log(m_event->getLevel(), m_event);
+}
+std::stringstream& LogEventWrap::getSS() {
+    return m_event->getSS();
+}
+
+
+
 /*******************************FormatItem*********************************/
 class MessageFormatItem : public LogFormatter::FormatItem {
 public:
@@ -128,26 +142,54 @@ private:
     std::string m_string;
 };
 
+class TabFormatItem : public LogFormatter::FormatItem {
+public:
+    TabFormatItem(const std::string& = "") {}
+    void format(Logger::ptr logger, std::ostream& os, LogLevel::Level level, LogEvent::ptr event) override {
+        os << "\t";
+    }
+};
+
 /*******************************LogEvent*********************************/
 
-LogEvent::LogEvent(const char* file, int32_t line, uint32_t elapse
+LogEvent::LogEvent(std::shared_ptr<Logger> logger, LogLevel::Level level,const char* file, int32_t line, uint32_t elapse
     , uint32_t threadId, uint32_t fiberId, uint64_t time)
     :m_file(file)
     ,m_line(line)
     ,m_elapse(elapse)
     ,m_threadId(threadId)
     ,m_fiberId(fiberId)
-    ,m_time(time) {
+    ,m_time(time) 
+    ,m_logger(logger) 
+    ,m_level(level) {
 
 }
 
+LogEvent::~LogEvent() {
+
+}
+
+void LogEvent::format(const char* fmt, ...) {
+    va_list al;
+    va_start(al, fmt);
+    format(fmt, al);
+    va_end(al);
+}
+void LogEvent::format(const char* fmt, va_list al) {
+    char* buf = nullptr;
+    int len = vasprintf(&buf, fmt, al);
+    if (len != -1) {
+        m_ss << std::string(buf, len);
+        free(buf);
+    }
+}
 
 /*******************************Logger*********************************/
 Logger::Logger(const std::string& name)
     : m_name(name) 
     , m_level(LogLevel::DEBUG){
     
-    m_formatter.reset(new LogFormatter("%d [%p] <%f:%l>    %m %n"));
+    m_formatter.reset(new LogFormatter("%d{%Y-%m-%d %H:%M:%S}%T%t%T%F%T[%p]%T[%c]%T%f:%l%T%m%n"));
 }
 
 void Logger::addAppender(LogAppender::ptr appender) {
@@ -194,7 +236,7 @@ void Logger::fatal(LogEvent::ptr event) {
 /*******************************LogAppender*********************************/
 FileLogAppender::FileLogAppender(const std::string& filename)
     :m_filename(filename) {
-
+    reopen();
 }
 
 void FileLogAppender::log(std::shared_ptr<Logger> logger, LogLevel::Level level, LogEvent::ptr event) {
@@ -237,11 +279,13 @@ void LogFormatter::init() {
     std::vector<std::tuple<std::string, std::string, int> > vec;
     std::string nstr;
     for (size_t i = 0; i < m_pattern.size(); i ++) {
+        //处理普通字符串
         if (m_pattern[i] != '%') {
             nstr.append(1, m_pattern[i]);
             continue;
         }
 
+        //处理%%
         if ((i + 1) < m_pattern.size()) {
             if (m_pattern[i + 1] == '%') {
                 nstr.append(1, '%');
@@ -257,8 +301,10 @@ void LogFormatter::init() {
         std::string fmt;
         //解析%xxx{xxx}
         while (n < m_pattern.size()) {
-            if (!isalpha(m_pattern[n]) && m_pattern[n] != '{' 
-                && m_pattern[n] != '}') {
+            //不是fmt且遇到了%
+            if (!fmt_status && (!isalpha(m_pattern[n]) && m_pattern[n] != '{' 
+                && m_pattern[n] != '}')) {
+                str = m_pattern.substr(i + 1, n - i - 1);
                 break;
             }
             if (fmt_status == 0) {
@@ -286,19 +332,20 @@ void LogFormatter::init() {
                 vec.push_back(std::make_tuple(nstr, std::string(), 0));
                 nstr.clear();
             }
+            //虽然和上面的273行代码重复了，但是这里是为处理pattern串中的末尾占位符
             str = m_pattern.substr(i + 1, n - i - 1);
             vec.push_back(std::make_tuple(str, fmt, 1));
-            i = n - 1;
+            i = n - 1;//以%T%t为例，若赋值为n，则会把%t解析为nstr的t
         } else if (fmt_status == 1) {
             std::cout << "pattern parse error: " << m_pattern << " - " << m_pattern.substr(i) << std::endl;
             vec.push_back(std::make_tuple("<<pattern_error>>", fmt, 0));
         } else if (fmt_status == 2) {
             if (!nstr.empty()) {
-                vec.push_back(std::make_tuple(nstr, "", 0));
+                vec.push_back(std::make_tuple(nstr, "", 0)); //0表示普通字符串，直接用StringFormatItem输出
                 nstr.clear();
             }
-            vec.push_back(std::make_tuple(str, fmt, 1));
-            i = n - 1;
+            vec.push_back(std::make_tuple(str, fmt, 1)); //1表示占位符，根据str的内容选择特定的FormatItem输出
+            i = n;
         }
     }
 
@@ -318,7 +365,9 @@ void LogFormatter::init() {
         XX(n, NewLineFormatItem),
         XX(d, DateTimeFormatItem),
         XX(f, FilenameFormatItem),
-        XX(l, LineFormatItem)
+        XX(l, LineFormatItem),
+        XX(T, TabFormatItem),
+        XX(F, FiberIdFormatItem)
 #undef XX
     };
     //%m -- 消息体
@@ -337,15 +386,30 @@ void LogFormatter::init() {
         } else {
             auto it = s_format_items.find(std::get<0>(i));
             if (it == s_format_items.end()) {
-                m_items.push_back(FormatItem::ptr(new StringFormatItem("<<error_format %" + std::get<0>(i) + ">>")));
+                std::string fmt = std::get<0>(i).empty() ? "null" : std::get<0>(i);
+                m_items.push_back(FormatItem::ptr(new StringFormatItem("<<error_format %" + fmt + ">>")));
             } else {
                 m_items.push_back(it->second(std::get<1>(i)));
             }
         }
 
-        std::cout << "(" << std::get<0>(i) << " ) - ( " << std::get<1>(i) << " ) - ( " << std::get<2>(i) << " )\n";
+        //std::cout << "(" << std::get<0>(i) << " ) - ( " << std::get<1>(i) << " ) - ( " << std::get<2>(i) << " )\n";
     }
-    std::cout << m_items.size() << std::endl;
+    //std::cout << m_items.size() << std::endl;
+}
+
+LoggerManager::LoggerManager() {
+    m_root.reset(new Logger);
+    m_root->addAppender(LogAppender::ptr(new StdoutLogAppender));
+}
+
+Logger::ptr LoggerManager::getLogger(const std::string& name) {
+    auto it = m_loggers.find(name);
+    return it == m_loggers.end() ? m_root : it->second;
+}
+
+void LoggerManager::init() {
+
 }
 
 }

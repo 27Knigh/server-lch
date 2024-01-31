@@ -1,0 +1,2 @@
+2024:01:31 08:49:45	ERROR	test macro error
+2024:01:31 08:49:45	ERROR	test macro fmt error aa

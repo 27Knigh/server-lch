@@ -9,6 +9,7 @@ set(CMAKE_CXX_FLAGS "$ENV{CXXFLAGS} -rdynamic -o0 -ggdb -std=c++11 -Wall -Wno-de
 
 set(LIB_SRC
     lch/log.cc
+    lch/util.cc
     )
 
 add_library(lch SHARED ${LIB_SRC})
