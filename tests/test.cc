@@ -1,6 +1,6 @@
 #include <iostream>
-#include "../lch/log.h"
-#include "../lch/util.h"
+#include "lch/log.h"
+#include "lch/util.h"
 
 int main() {
     lch::Logger::ptr logger(new lch::Logger);

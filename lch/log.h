@@ -13,7 +13,8 @@
 #include <time.h>
 #include <stdarg.h>
 
-#include "./singleton.h"
+#include "singleton.h"
+#include "util.h"
 
 //这条宏是为提供日志器的简便使用方式
 #define LCH_LOG_LEVEL(logger, level) \
@@ -40,6 +41,8 @@
 #define LCH_LOG_FMT_WARN(logger, fmt, ...) LCH_LOG_FMT_LEVEL(logger, lch::LogLevel::WARN, fmt, __VA_ARGS__)
 #define LCH_LOG_FMT_ERROR(logger, fmt, ...) LCH_LOG_FMT_LEVEL(logger, lch::LogLevel::ERROR, fmt, __VA_ARGS__)
 #define LCH_LOG_FMT_FATAL(logger, fmt, ...) LCH_LOG_FMT_LEVEL(logger, lch::LogLevel::FATAL, fmt, __VA_ARGS__)
+
+#define LCH_LOG_ROOT() lch::LoggerMgr::GetInstance()->getRoot()
 
 namespace lch {
 
@@ -203,6 +206,7 @@ public:
     Logger::ptr getLogger(const std::string& name);
 
     void init();
+    Logger::ptr getRoot() const { return m_root; }
 private:
     std::map<std::string, Logger::ptr> m_loggers;
     Logger::ptr m_root;

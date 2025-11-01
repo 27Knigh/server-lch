@@ -4,21 +4,28 @@ project(lch)
 #开启编译详情
 set(CMAKE_VERBOSE_MAKEFILE ON)
 #自定义编译参数
-set(CMAKE_CXX_FLAGS "$ENV{CXXFLAGS} -rdynamic -o0 -ggdb -std=c++11 -Wall -Wno-deprecated -Werror -Wno-unused-function ")
-
+set(CMAKE_CXX_FLAGS "$ENV{CXXFLAGS} -rdynamic -O0 -ggdb -std=c++11 -Wall -Wno-deprecated -Werror -Wno-unused-function ")
 
 set(LIB_SRC
     lch/log.cc
     lch/util.cc
+    lch/config.cc
     )
 
 add_library(lch SHARED ${LIB_SRC})
+target_link_libraries(lch yaml-cpp)
 #add_library(lch_static STATIC ${LIB_SRC})
 #SET_TARGET_PROPERTIES (lch_static PROPERTIES OUTPUT_NAME "lch")
 
 add_executable(test tests/test.cc)
 add_dependencies(test lch)
+target_include_directories(test PUBLIC ${CMAKE_SOURCE_DIR}/)
 target_link_libraries(test lch)
+
+add_executable(test_config tests/test_config.cc)
+add_dependencies(test_config lch)
+target_include_directories(test_config PUBLIC ${CMAKE_SOURCE_DIR}/)
+target_link_libraries(test_config lch yaml-cpp)
 
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
