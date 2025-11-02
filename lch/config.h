@@ -31,7 +31,7 @@ public:
 
     virtual std::string toString() = 0;
     virtual bool fromString(const std::string& val) = 0;
-
+    virtual std::string getTypeName() const = 0;
 protected:
     std::string m_name;
     std::string m_description;
@@ -244,7 +244,7 @@ public:
         , m_val(default_value){
     }
 
-    std::string toString() {
+    std::string toString() override {
         try{
             //return boost::lexical_cast<std::string>(m_val);
             return ToStr()(m_val);
@@ -256,7 +256,7 @@ public:
         return "";
     }
 
-    bool fromString(const std::string& val) {
+    bool fromString(const std::string& val) override {
         try{
             // m_val = boost::lexical_cast<T>(val);
             setValue(FromStr()(val));
@@ -268,10 +268,10 @@ public:
         }
         return false;
     }
-
+    std::string getTypeName()  const override { return typeid(T).name(); }
     const T getValue() const { return m_val; }
     void setValue(const T& v) { m_val = v; }
-
+   
 private:
     T m_val;
 };
@@ -284,10 +284,18 @@ public:
     static typename ConfigVar<T>::ptr Lookup(const std::string& name
         , const T& default_value
         , const std::string& description = "") {
-        auto tmp = Lookup<T>(name);
-        if (tmp) {
-            LCH_LOG_INFO(LCH_LOG_ROOT()) << "Lookup name=" << name << " exists";
-            return tmp;
+
+        auto it = s_datas.find(name);
+        if (it != s_datas.end()) {
+            auto tmp = std::dynamic_pointer_cast<ConfigVar<T> >(it->second);
+            if (tmp) {
+                LCH_LOG_INFO(LCH_LOG_ROOT()) << "Lookup name=" << name << " exists";
+                return tmp;
+            } else {
+                LCH_LOG_ERROR(LCH_LOG_ROOT()) << "Lookup name=" << name << " exists but type not "
+                                              << typeid(T).name() << " real_type= " << it->second->getTypeName();
+                return nullptr;
+            }
         }
 
         if (name.find_first_not_of("abcdefghijklmnopqrstuvwxyz._0123456789")
