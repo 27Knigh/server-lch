@@ -65,6 +65,18 @@
         "cinttypes": "cpp",
         "typeindex": "cpp",
         "variant": "cpp",
-        "format": "cpp"
-    }
+        "format": "cpp",
+        "bitset": "cpp",
+        "condition_variable": "cpp",
+        "mutex": "cpp",
+        "semaphore": "cpp",
+        "cfenv": "cpp"
+    },
+    "editor.quickSuggestionsDelay": 10,
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+    "C_Cpp.intelliSenseEngine": "Tag Parser",
+    "C_Cpp.default.compilerPath": "/usr/bin/g++-12",
+    "cSpell.words": [
+        "appenders"
+    ]
 }

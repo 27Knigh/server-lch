@@ -36,8 +36,7 @@ lch::ConfigVar<std::map<std::string, int> >::ptr g_str_int_map_value_config = lc
 
 lch::ConfigVar<std::unordered_map<std::string, int> >::ptr g_str_int_umap_value_config = lch::Config::Lookup("system.str_int_umap", 
                                                                 std::unordered_map<std::string, int>{{"k", 1}, {"k2", 2}},
-                                                                "system str_int_umap");  
-
+                                                                "system str_int_umap");                
 
 void print_yaml(const YAML::Node& node, int level) {
     if (node.IsScalar()) {
@@ -62,7 +61,7 @@ void print_yaml(const YAML::Node& node, int level) {
 }
 
 void test_yaml() {
-    YAML::Node root = YAML::LoadFile("/home/lch/share/server-lch/bin/conf/log.yml");
+    YAML::Node root = YAML::LoadFile("/home/lch/share/server-lch/bin/conf/test.yml");
     //LCH_LOG_INFO(LCH_LOG_ROOT()) << root;
     print_yaml(root, 0);
     LCH_LOG_INFO(LCH_LOG_ROOT()) << root.Scalar();
@@ -97,7 +96,7 @@ void test_config() {
     XX_M(g_str_int_map_value_config, str_int_map, before);
     XX_M(g_str_int_umap_value_config, str_int_umap, before);
 
-    YAML::Node root = YAML::LoadFile("/home/lch/share/server-lch/bin/conf/log.yml");
+    YAML::Node root = YAML::LoadFile("/home/lch/share/server-lch/bin/conf/test.yml");
     lch::Config::LoadYamlFile(root);
 
     LCH_LOG_INFO(LCH_LOG_ROOT()) << "after: " << g_int_value_config->getValue();
@@ -120,6 +119,12 @@ public:
            << "age=" << m_age << ", "
            << "sex=" << m_name << " ]";
         return ss.str();
+    }
+
+    bool operator==(const Person& right) const {
+        return m_name == right.m_name &&
+               m_age == right.m_age &&
+               m_sex == right.m_sex;
     }
 public:
     std::string m_name;
@@ -178,9 +183,14 @@ void test_class() {
         } \
     } while(0)
 
+    g_person->addListener(10, [](const Person& old_val, const Person& new_val){
+        LCH_LOG_INFO(LCH_LOG_ROOT()) << "old val=" << old_val.toString()
+            << " new val=" << new_val.toString();
+    });
+
     XX_PM(g_person_map, "class.map before");
 
-    YAML::Node root = YAML::LoadFile("/home/lch/share/server-lch/bin/conf/log.yml");
+    YAML::Node root = YAML::LoadFile("/home/lch/share/server-lch/bin/conf/test.yml");
     lch::Config::LoadYamlFile(root);
     LCH_LOG_INFO(LCH_LOG_ROOT()) << "after: " << g_person->getValue().toString()
                                  << " - " << g_person->toString();
@@ -188,11 +198,25 @@ void test_class() {
     XX_PM(g_person_map, "class.map after");
 }
 
+void test_log() {
+    static lch::Logger::ptr system_log = LCH_LOG_NAME("system");
+    LCH_LOG_INFO(system_log) << "hello system" << std::endl;
+    YAML::Node root = YAML::LoadFile("/home/lch/share/server-lch/bin/conf/log.yml");
+    lch::Config::LoadYamlFile(root);
+    std::cout << "+++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
+    std::cout << lch::LoggerMgr::GetInstance()->toYamlString() << std::endl;
+    std::cout << "+++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
+    std::cout << root << std::endl;
+    LCH_LOG_INFO(system_log) << "hello system" << std::endl;
+
+    system_log->setFormatter("%d - %m%n");
+    LCH_LOG_INFO(system_log) << "hello system" << std::endl;
+}
 
 int main(int argc, char** argv) {
-    test_class();
+    //test_class();
     //test_config();
     //test_yaml();
-
+    test_log();
     return 0;
 }

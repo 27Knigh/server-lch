@@ -2,11 +2,11 @@
 
 namespace lch {
 
-Config::ConfigVarMap Config::s_datas;
+static lch::Logger::ptr g_logger = LCH_LOG_NAME("system");
 
 ConfigVarBase::ptr Config::LookupBase(const std::string& name){
-    auto it = s_datas.find(name);
-    return it == s_datas.end() ? nullptr : it->second;
+    auto it = GetDatas().find(name);
+    return it == GetDatas().end() ? nullptr : it->second;
 }
 
 static void ListAllMember(const std::string prefix,
@@ -42,7 +42,7 @@ void Config::LoadYamlFile(const YAML::Node& root) {
                 var->fromString(i.second.Scalar());
             } else {
                 std::stringstream ss;
-                ss << i.second;
+                ss << i.second; //转正Yaml格式的字符串
                 var->fromString(ss.str());
             }
         }
